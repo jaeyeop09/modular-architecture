@@ -87,22 +87,22 @@ const defaults={
  furniture:{width:120,depth:60,height:75}
 };
 let state={projectName:'My Building',objects:[],selectedId:null,version:1};
-let history=[],future=[],drag=null,mode='2d';
+let history=[],future=[],drag=null,mode='2d',lastSnapshot=clone(state);
 const $=id=>document.getElementById(id), canvas=$('plan2d'),ctx=canvas.getContext('2d');
 function uid(type){return type+'-'+Math.random().toString(36).slice(2,9)}
 function snap(v){return Math.round(v/SNAP)*SNAP}
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function selected(){return state.objects.find(o=>o.id===state.selectedId)||null}
 function commit(label='변경'){
- history.push(clone(state)); if(history.length>50) history.shift(); future=[]; render2D(); renderProps(); update3D();
+ history.push(lastSnapshot); if(history.length>50) history.shift(); lastSnapshot=clone(state); future=[]; render2D(); renderProps(); update3D();
  $('saveStatus').textContent=label;
 }
 function restore(s){state=clone(s);render2D();renderProps();update3D()}
-function undo(){if(!history.length)return;future.push(clone(state));state=history.pop();render2D();renderProps();update3D()}
-function redo(){if(!future.length)return;history.push(clone(state));state=future.pop();render2D();renderProps();update3D()}
+function undo(){if(!history.length)return;future.push(clone(state));state=history.pop();lastSnapshot=clone(state);render2D();renderProps();update3D()}
+function redo(){if(!future.length)return;history.push(lastSnapshot);state=future.pop();lastSnapshot=clone(state);render2D();renderProps();update3D()}
 function addObject(type,x=500,y=400){
  const d=defaults[type], n={id:uid(type),type,x:snap(x),y:snap(y),width:d.width,depth:d.depth,height:d.height,rotation:0,installHeight:type==='window'?100:0};
- if(type==='floor'){n.x=0;n.y=0} if(type==='roof'){n.x=0;n.y=0}
+ if(type==='floor'||type==='roof'){n.x=500;n.y=400}
  state.objects.push(n);state.selectedId=n.id;commit(type+' 추가');
 }
 function removeSelected(){if(!selected())return;const id=state.selectedId;state.objects=state.objects.filter(o=>o.id!==id);state.selectedId=null;commit('객체 삭제')}
@@ -180,11 +180,11 @@ function setMode(m){mode=m;$('twoView').classList.toggle('hidden',m!=='2d');$('t
 $('mode2d').onclick=()=>setMode('2d');$('mode3d').onclick=()=>setMode('3d');$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;$('deleteBtn').onclick=removeSelected;$('selectBtn').onclick=()=>{state.selectedId=null;render2D();renderProps();updateSelectionLabel()};
 document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>addObject(b.dataset.type,500,400));
 $('projectName').addEventListener('change',()=>{state.projectName=$('projectName').value;commit('프로젝트명 변경')});
-$('newBtn').onclick=()=>{if(!confirm('현재 설계를 새 프로젝트로 바꿀까요?'))return;history=[];future=[];state={projectName:'My Building',objects:[],selectedId:null,version:1};$('projectName').value=state.projectName;render2D();renderProps();update3D();toast('새 프로젝트가 생성되었습니다.')};
+$('newBtn').onclick=()=>{if(!confirm('현재 설계를 새 프로젝트로 바꿀까요?'))return;history=[];future=[];state={projectName:'My Building',objects:[],selectedId:null,version:1};lastSnapshot=clone(state);$('projectName').value=state.projectName;render2D();renderProps();update3D();toast('새 프로젝트가 생성되었습니다.')};
 $('saveBtn').onclick=()=>{
  const data=JSON.stringify(state,null,2),blob=new Blob([data],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(state.projectName||'building')+'.json';a.click();URL.revokeObjectURL(a.href);localStorage.setItem('modularArchitectProject',data);toast('JSON 파일로 저장했습니다.')}
 $('loadBtn').onclick=()=>$('fileInput').click();
-$('fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!Array.isArray(d.objects))throw Error();history.push(clone(state));state=d;$('projectName').value=state.projectName||'My Building';render2D();renderProps();update3D();toast('프로젝트를 불러왔습니다.')}catch{toast('올바른 프로젝트 JSON이 아닙니다.')}};rd.readAsText(f);e.target.value=''};
+$('fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!Array.isArray(d.objects))throw Error();history.push(lastSnapshot);state=d;lastSnapshot=clone(state);$('projectName').value=state.projectName||'My Building';render2D();renderProps();update3D();toast('프로젝트를 불러왔습니다.')}catch{toast('올바른 프로젝트 JSON이 아닙니다.')}};rd.readAsText(f);e.target.value=''};
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
 function checkMission(){
  const obs=state.objects,cols=obs.filter(o=>o.type==='column'),walls=obs.filter(o=>o.type==='wall'),floors=obs.filter(o=>o.type==='floor');
@@ -252,6 +252,10 @@ function update3D(){
 }
 function resize3D(){if(!renderer)return;const root=$('threeRoot');renderer.setSize(root.clientWidth,root.clientHeight,false);camera.aspect=root.clientWidth/root.clientHeight;camera.updateProjectionMatrix()}
 window.addEventListener('resize',()=>{resize();resize3D()});
+try{
+ const saved=localStorage.getItem('modularArchitectProject');
+ if(saved){const d=JSON.parse(saved);if(Array.isArray(d.objects)){state=d;lastSnapshot=clone(state);$('projectName').value=state.projectName||'My Building';}}
+}catch{}
 resize();renderProps();updateSelectionLabel();
 </script>
 </body>
