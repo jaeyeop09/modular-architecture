@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modular Architect — 2D/3D 내진 설계</title>
+<style>
+:root{--bg:#0f172a;--panel:#111827;--panel2:#172033;--line:#2b3850;--text:#e5e7eb;--muted:#94a3b8;--accent:#10b981;--danger:#ef4444;--blue:#38bdf8}
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:Arial,"Noto Sans KR",sans-serif;background:#0b1220;color:var(--text);overflow:hidden}
+button,input,select{font:inherit}button{border:1px solid var(--line);background:#172033;color:var(--text);border-radius:7px;padding:8px 11px;cursor:pointer}button:hover{background:#20304a}button.primary{background:var(--accent);border-color:var(--accent);color:#06271d;font-weight:700}button.danger{background:#3a1820;border-color:#7f1d1d;color:#fecaca}
+.app{height:100%;display:flex;flex-direction:column}.topbar{height:58px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0f172a;border-bottom:1px solid var(--line);flex-shrink:0}.brand{font-weight:800;font-size:17px;margin-right:12px;white-space:nowrap}.brand span{color:var(--accent)}.project-name{width:190px;background:#111827;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:8px}.spacer{flex:1}.status{font-size:12px;color:var(--muted);padding:0 6px}.main{min-height:0;flex:1;display:grid;grid-template-columns:170px 1fr 245px}.toolbar{background:#0f172a;border-right:1px solid var(--line);padding:12px;overflow:auto}.toolbar h3,.properties h3{font-size:12px;color:var(--muted);margin:5px 0 9px;text-transform:uppercase;letter-spacing:.08em}.toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.tool{min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.tool b{font-size:12px}.tool small{font-size:10px;color:var(--muted)}.section{margin-top:16px}.workspace{position:relative;min-width:0;min-height:0;background:#e8edf2}.view{position:absolute;inset:0}.hidden{display:none!important}#plan2d{width:100%;height:100%;display:block;background:#f7f9fb;cursor:default}.properties{background:#0f172a;border-left:1px solid var(--line);padding:12px;overflow:auto}.prop-row{display:grid;grid-template-columns:72px 1fr;align-items:center;gap:7px;margin:8px 0}.prop-row label{font-size:12px;color:var(--muted)}.prop-row input{width:100%;background:#111827;border:1px solid var(--line);color:var(--text);border-radius:6px;padding:7px}.prop-note{font-size:11px;color:var(--muted);line-height:1.5}.empty{padding:18px 4px;color:var(--muted);font-size:12px;line-height:1.6}.bottom{position:absolute;left:12px;bottom:12px;display:flex;gap:7px;align-items:center;background:rgba(15,23,42,.9);padding:8px 10px;border:1px solid #334155;border-radius:9px;font-size:12px}.mode{font-weight:700;color:var(--accent)}#threeRoot{position:absolute;inset:0;background:#dbe3ea}.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:20}.dialog{width:min(560px,92vw);max-height:80vh;overflow:auto;background:#101827;border:1px solid #334155;border-radius:14px;padding:20px;box-shadow:0 20px 70px #0008}.dialog h2{margin:0 0 14px}.result{padding:12px;border-radius:9px;background:#172033;margin:8px 0;font-size:13px}.pass{border-left:4px solid var(--accent)}.fail{border-left:4px solid var(--danger)}.result strong{display:block;margin-bottom:5px}.result ul{margin:7px 0 0 18px;padding:0;color:#cbd5e1}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.toast{position:fixed;right:20px;bottom:20px;background:#111827;border:1px solid #334155;padding:10px 14px;border-radius:8px;z-index:50;opacity:0;transform:translateY(8px);transition:.2s}.toast.show{opacity:1;transform:none}.legend{position:absolute;right:12px;top:12px;background:rgba(255,255,255,.92);color:#334155;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 12px #0001}.shortcut{margin-top:12px;font-size:10px;color:#64748b;line-height:1.6}
+@media(max-width:850px){.main{grid-template-columns:120px 1fr}.properties{display:none}.brand{font-size:14px}.project-name{width:130px}.tool{min-height:48px}.toolgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="topbar">
+  <div class="brand">MODULAR <span>ARCHITECT</span></div>
+  <input id="projectName" class="project-name" value="My Building" aria-label="프로젝트명">
+  <button id="newBtn">새 프로젝트</button><button id="undoBtn">↶</button><button id="redoBtn">↷</button>
+  <button id="saveBtn">저장</button><button id="loadBtn">불러오기</button><input id="fileInput" type="file" accept=".json" class="hidden">
+  <div class="spacer"></div><span id="saveStatus" class="status">준비됨</span>
+  <button id="mode2d" class="primary">2D</button><button id="mode3d">3D</button><button id="missionBtn" class="primary">내진 설계 검사</button>
+</header>
+<main class="main">
+<aside class="toolbar">
+  <h3>설계 도구</h3>
+  <div class="toolgrid">
+    <button class="tool" data-type="wall">▭<b>벽</b><small>400×20</small></button>
+    <button class="tool" data-type="door">▯<b>문</b><small>90×10</small></button>
+    <button class="tool" data-type="window">▥<b>창문</b><small>120×10</small></button>
+    <button class="tool" data-type="column">▮<b>기둥</b><small>40×40</small></button>
+    <button class="tool" data-type="floor">□<b>바닥</b><small>1000×800</small></button>
+    <button class="tool" data-type="stair">▤<b>계단</b><small>240×120</small></button>
+    <button class="tool" data-type="roof">⌂<b>지붕</b><small>1000×800</small></button>
+    <button class="tool" data-type="furniture">□<b>가구</b><small>120×60</small></button>
+  </div>
+  <div class="section">
+    <h3>편집</h3>
+    <div class="toolgrid">
+      <button id="selectBtn" class="tool">↖<b>선택</b></button>
+      <button id="deleteBtn" class="tool danger">⌫<b>삭제</b></button>
+    </div>
+  </div>
+  <div class="shortcut">
+    <b>조작</b><br>
+    • 마우스 드래그: 이동<br>
+    • 방향키: 2cm 이동<br>
+    • Delete: 삭제<br>
+    • Shift+드래그: 자유 이동<br>
+    • 좌표 직접 입력 가능
+  </div>
+</aside>
+<section class="workspace">
+  <div id="twoView" class="view"><canvas id="plan2d"></canvas><div class="legend">Grid 20cm · Snap 2cm · 단위 cm</div></div>
+  <div id="threeRoot" class="view hidden"></div>
+  <div class="bottom"><span>현재 모드:</span><span id="modeLabel" class="mode">2D 평면도</span><span>선택:</span><span id="selectionLabel">없음</span></div>
+</section>
+<aside class="properties">
+  <h3>객체 속성</h3>
+  <div id="propertiesContent" class="empty">객체를 선택하면 X/Y 좌표와 크기, 높이, 회전을 수정할 수 있습니다.</div>
+</aside>
+</main>
+</div>
+<div id="missionModal" class="modal hidden">
+ <div class="dialog">
+   <h2 id="missionTitle">내진 설계 검사</h2>
+   <div id="missionBody"></div>
+   <div class="dialog-actions"><button id="closeMission">닫기</button></div>
+ </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js';
+import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/controls/OrbitControls.js';
+
+const SNAP=2, GRID=20, SCALE=0.55;
+const defaults={
+ wall:{width:400,depth:20,height:300},
+ door:{width:90,depth:10,height:210},
+ window:{width:120,depth:10,height:120},
+ column:{width:40,depth:40,height:300},
+ floor:{width:1000,depth:800,height:5},
+ stair:{width:240,depth:120,height:120},
+ roof:{width:1000,depth:800,height:30},
+ furniture:{width:120,depth:60,height:75}
+};
+let state={projectName:'My Building',objects:[],selectedId:null,version:1};
+let history=[],future=[],drag=null,mode='2d';
+const $=id=>document.getElementById(id), canvas=$('plan2d'),ctx=canvas.getContext('2d');
+function uid(type){return type+'-'+Math.random().toString(36).slice(2,9)}
+function snap(v){return Math.round(v/SNAP)*SNAP}
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function selected(){return state.objects.find(o=>o.id===state.selectedId)||null}
+function commit(label='변경'){
+ history.push(clone(state)); if(history.length>50) history.shift(); future=[]; render2D(); renderProps(); update3D();
+ $('saveStatus').textContent=label;
+}
+function restore(s){state=clone(s);render2D();renderProps();update3D()}
+function undo(){if(!history.length)return;future.push(clone(state));state=history.pop();render2D();renderProps();update3D()}
+function redo(){if(!future.length)return;history.push(clone(state));state=future.pop();render2D();renderProps();update3D()}
+function addObject(type,x=500,y=400){
+ const d=defaults[type], n={id:uid(type),type,x:snap(x),y:snap(y),width:d.width,depth:d.depth,height:d.height,rotation:0,installHeight:type==='window'?100:0};
+ if(type==='floor'){n.x=0;n.y=0} if(type==='roof'){n.x=0;n.y=0}
+ state.objects.push(n);state.selectedId=n.id;commit(type+' 추가');
+}
+function removeSelected(){if(!selected())return;const id=state.selectedId;state.objects=state.objects.filter(o=>o.id!==id);state.selectedId=null;commit('객체 삭제')}
+function setProp(key,val){
+ const o=selected(); if(!o)return; const n=Number(val); if(!Number.isFinite(n))return;
+ if(['x','y','width','depth','height','rotation','installHeight'].includes(key))o[key]=key==='rotation'?n:snap(n);
+ if(o.width<2)o.width=2;if(o.depth<2)o.depth=2;if(o.height<2)o.height=2;
+ commit('속성 수정');
+}
+function resize(){const r=canvas.getBoundingClientRect(),d=devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.setTransform(d,0,0,d,0,0);render2D()}
+function worldToScreen(x,y){return {x:x*SCALE+70,y:y*SCALE+50}}
+function screenToWorld(x,y){return {x:(x-70)/SCALE,y:(y-50)/SCALE}}
+function drawRotRect(o,fill,stroke){
+ const p=worldToScreen(o.x,o.y),w=o.width*SCALE,h=o.depth*SCALE;
+ ctx.save();ctx.translate(p.x,p.y);ctx.rotate(o.rotation*Math.PI/180);ctx.fillStyle=fill;ctx.strokeStyle=stroke;ctx.lineWidth=1;
+ ctx.fillRect(-w/2,-h/2,w,h);ctx.strokeRect(-w/2,-h/2,w,h);ctx.restore();
+}
+function render2D(){
+ const W=canvas.clientWidth,H=canvas.clientHeight;ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='#f7f9fb';ctx.fillRect(0,0,W,H);
+ ctx.strokeStyle='#dce3e9';ctx.lineWidth=1;
+ const startX=70,startY=50;
+ for(let x=startX;x<W;x+=GRID*SCALE){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+ for(let y=startY;y<H;y+=GRID*SCALE){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ ctx.strokeStyle='#aab7c4';ctx.beginPath();ctx.moveTo(startX,0);ctx.lineTo(startX,H);ctx.moveTo(0,startY);ctx.lineTo(W,startY);ctx.stroke();
+ ctx.fillStyle='#64748b';ctx.font='10px Arial';ctx.fillText('0',54,46);ctx.fillText('X →',W-35,46);ctx.fillText('Y ↓',74,14);
+ for(const o of state.objects){
+   let fill='#cbd5e1',stroke='#64748b';
+   if(o.type==='wall'){fill='#64748b';stroke='#334155'}
+   if(o.type==='column'){fill='#10b981';stroke='#047857'}
+   if(o.type==='floor'){fill='rgba(148,163,184,.25)';stroke='#94a3b8'}
+   if(o.type==='door'){fill='#d9a441';stroke='#8a6417'}
+   if(o.type==='window'){fill='#38bdf8';stroke='#0369a1'}
+   if(o.type==='stair'){fill='#a78bfa';stroke='#6d28d9'}
+   if(o.type==='roof'){fill='rgba(239,68,68,.18)';stroke='#ef4444'}
+   if(o.type==='furniture'){fill='#b8a58a';stroke='#795548'}
+   drawRotRect(o,fill,stroke);
+   const p=worldToScreen(o.x,o.y);ctx.save();ctx.fillStyle='#1e293b';ctx.font='10px Arial';ctx.textAlign='center';ctx.fillText(o.type,p.x,p.y+3);ctx.restore();
+   if(o.id===state.selectedId){ctx.save();ctx.strokeStyle='#0f766e';ctx.lineWidth=2;ctx.setLineDash([5,4]);const p=worldToScreen(o.x,o.y);ctx.translate(p.x,p.y);ctx.rotate(o.rotation*Math.PI/180);ctx.strokeRect(-o.width*SCALE/2-4,-o.depth*SCALE/2-4,o.width*SCALE+8,o.depth*SCALE+8);ctx.restore()}
+ }
+}
+function hitTest(mx,my){
+ for(let i=state.objects.length-1;i>=0;i--){const o=state.objects[i],p=worldToScreen(o.x,o.y);const dx=mx-p.x,dy=my-p.y,rad=o.rotation*Math.PI/180;
+  const x=dx*Math.cos(rad)+dy*Math.sin(rad),y=-dx*Math.sin(rad)+dy*Math.cos(rad);
+  if(Math.abs(x)<=o.width*SCALE/2+4&&Math.abs(y)<=o.depth*SCALE/2+4)return o;
+ }return null
+}
+canvas.addEventListener('pointerdown',e=>{
+ const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,o=hitTest(mx,my);
+ state.selectedId=o?o.id:null;render2D();renderProps();updateSelectionLabel();
+ if(o){canvas.setPointerCapture(e.pointerId);drag={id:o.id,startX:mx,startY:my,ox:o.x,oy:o.y,free:e.shiftKey}}
+});
+canvas.addEventListener('pointermove',e=>{
+ if(!drag)return;const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,o=state.objects.find(x=>x.id===drag.id);if(!o)return;
+ const a=screenToWorld(mx,my),b=screenToWorld(drag.startX,drag.startY),dx=a.x-b.x,dy=a.y-b.y;
+ o.x=drag.free?drag.ox+dx:snap(drag.ox+dx);o.y=drag.free?drag.oy+dy:snap(drag.oy+dy);render2D();renderProps();updateSelectionLabel();
+});
+canvas.addEventListener('pointerup',()=>{if(drag){drag=null;commit('객체 이동')}})
+window.addEventListener('keydown',e=>{
+ if(e.key==='Delete'||e.key==='Backspace'){if(document.activeElement.tagName!=='INPUT')removeSelected()}
+ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&selected()&&document.activeElement.tagName!=='INPUT'){e.preventDefault();const o=selected();if(e.key==='ArrowUp')o.y-=SNAP;if(e.key==='ArrowDown')o.y+=SNAP;if(e.key==='ArrowLeft')o.x-=SNAP;if(e.key==='ArrowRight')o.x+=SNAP;commit('2cm 이동')}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}
+});
+function renderProps(){
+ const box=$('propertiesContent'),o=selected();if(!o){box.className='empty';box.innerHTML='객체를 선택하면 X/Y 좌표와 크기, 높이, 회전을 수정할 수 있습니다.';return}
+ box.className='';box.innerHTML='<div style="font-weight:700;margin-bottom:10px">'+o.type.toUpperCase()+'</div>';
+ const fields=[['x','X 좌표'],['y','Y 좌표'],['width','너비'],['depth','깊이/두께'],['height','높이'],['rotation','회전']];
+ if(o.type==='window')fields.push(['installHeight','설치 높이']);
+ for(const [key,label] of fields){const row=document.createElement('div');row.className='prop-row';const l=document.createElement('label');l.textContent=label;const inp=document.createElement('input');inp.type='number';inp.step=key==='rotation'?'1':'2';inp.value=o[key]??0;inp.addEventListener('change',()=>setProp(key,inp.value));row.append(l,inp);box.append(row)}
+ const note=document.createElement('div');note.className='prop-note';note.innerHTML='단위: cm · 일반 이동은 2cm Snap<br>현재 ID: '+o.id;box.append(note);
+}
+function updateSelectionLabel(){$('selectionLabel').textContent=selected()?selected().type+' · '+selected().id:'없음'}
+function setMode(m){mode=m;$('twoView').classList.toggle('hidden',m!=='2d');$('threeRoot').classList.toggle('hidden',m!=='3d');$('mode2d').classList.toggle('primary',m==='2d');$('mode3d').classList.toggle('primary',m==='3d');$('modeLabel').textContent=m==='2d'?'2D 평면도':'3D 공간';if(m==='3d')init3D();update3D()}
+$('mode2d').onclick=()=>setMode('2d');$('mode3d').onclick=()=>setMode('3d');$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;$('deleteBtn').onclick=removeSelected;$('selectBtn').onclick=()=>{state.selectedId=null;render2D();renderProps();updateSelectionLabel()};
+document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>addObject(b.dataset.type,500,400));
+$('projectName').addEventListener('change',()=>{state.projectName=$('projectName').value;commit('프로젝트명 변경')});
+$('newBtn').onclick=()=>{if(!confirm('현재 설계를 새 프로젝트로 바꿀까요?'))return;history=[];future=[];state={projectName:'My Building',objects:[],selectedId:null,version:1};$('projectName').value=state.projectName;render2D();renderProps();update3D();toast('새 프로젝트가 생성되었습니다.')};
+$('saveBtn').onclick=()=>{
+ const data=JSON.stringify(state,null,2),blob=new Blob([data],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(state.projectName||'building')+'.json';a.click();URL.revokeObjectURL(a.href);localStorage.setItem('modularArchitectProject',data);toast('JSON 파일로 저장했습니다.')}
+$('loadBtn').onclick=()=>$('fileInput').click();
+$('fileInput').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!Array.isArray(d.objects))throw Error();history.push(clone(state));state=d;$('projectName').value=state.projectName||'My Building';render2D();renderProps();update3D();toast('프로젝트를 불러왔습니다.')}catch{toast('올바른 프로젝트 JSON이 아닙니다.')}};rd.readAsText(f);e.target.value=''};
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
+function checkMission(){
+ const obs=state.objects,cols=obs.filter(o=>o.type==='column'),walls=obs.filter(o=>o.type==='wall'),floors=obs.filter(o=>o.type==='floor');
+ const xs=cols.map(o=>o.x),ys=cols.map(o=>o.y),cx=xs.length?(Math.min(...xs)+Math.max(...xs))/2:0,cy=ys.length?(Math.min(...ys)+Math.max(...ys))/2:0;
+ const spreadX=xs.length?Math.max(...xs)-Math.min(...xs):0,spreadY=ys.length?Math.max(...ys)-Math.min(...ys):0;
+ const balanced=cols.length>=4&&spreadX>=120&&spreadY>=120;
+ const maxH=obs.length?Math.max(...obs.map(o=>o.height||0)):0;
+ const tallOK=maxH<=300||cols.length>=6;
+ const hasFloor=floors.length>0;
+ const structuralConnected=hasFloor&&cols.every(c=>{const f=floors.find(x=>c.x>=x.x-x.width/2&&c.x<=x.x+x.width/2&&c.y>=x.y-x.depth/2&&c.y<=x.y+x.depth/2);return !!f});
+ const centerOK=cols.length>=4&&cols.every(c=>Math.hypot(c.x-cx,c.y-cy)<Math.max(spreadX,spreadY)*0.75);
+ const checks=[
+  ['기둥 개수',cols.length>=4,'기둥 '+cols.length+'개'],
+  ['벽 개수',walls.length>=4,'벽 '+walls.length+'개'],
+  ['기둥 균형 배치',balanced,'X 범위 '+spreadX+'cm / Y 범위 '+spreadY+'cm'],
+  ['구조 중심 안정성',centerOK,'기둥 분포 중심을 검사했습니다.'],
+  ['높이 대비 수직 구조',tallOK,'최대 높이 '+maxH+'cm / 기둥 '+cols.length+'개'],
+  ['바닥-구조 연결',structuralConnected,'바닥 '+floors.length+'개']
+ ];
+ const pass=checks.every(x=>x[1]);
+ $('missionTitle').textContent=pass?'🎉 내진 설계 미션 성공!':'내진 설계 미션 실패';
+ $('missionBody').innerHTML=checks.map(c=>'<div class="result '+(c[1]?'pass':'fail')+'"><strong>'+(c[1]?'✓':'✕')+' '+c[0]+'</strong><span>'+c[2]+'</span></div>').join('')+
+ '<div class="prop-note" style="margin-top:12px">※ 이 검사는 학습용 미션 규칙을 적용한 프로그램상의 판정이며 실제 구조안전 검토를 대신하지 않습니다.</div>';
+ $('missionModal').classList.remove('hidden')
+}
+$('missionBtn').onclick=checkMission;$('closeMission').onclick=()=>$('missionModal').classList.add('hidden');$('missionModal').addEventListener('click',e=>{if(e.target===$('missionModal'))$('missionModal').classList.add('hidden')});
+
+let renderer,scene,camera,controls,threeObjects=new Map(),threeReady=false;
+function init3D(){
+ if(threeReady)return;
+ const root=$('threeRoot');scene=new THREE.Scene();scene.background=new THREE.Color(0xdbe3ea);
+ camera=new THREE.PerspectiveCamera(45,1,.1,5000);camera.position.set(1300,900,1300);
+ renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;root.appendChild(renderer.domElement);
+ controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.target.set(400,0,300);
+ const amb=new THREE.HemisphereLight(0xffffff,0x64748b,2);scene.add(amb);const dir=new THREE.DirectionalLight(0xffffff,2.2);dir.position.set(700,1000,500);dir.castShadow=true;scene.add(dir);
+ const grid=new THREE.GridHelper(2400,120,0x64748b,0xb8c4d0);scene.add(grid);
+ const axes=new THREE.AxesHelper(300);scene.add(axes);
+ const animate=()=>{requestAnimationFrame(animate);controls.update();renderer.render(scene,camera)};animate();threeReady=true;resize3D();
+}
+function mat(color,rough=.65,metal=0){return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal})}
+function build3D(o){
+ const group=new THREE.Group();group.userData.id=o.id;
+ const x=o.x,y=o.height/2,z=o.y;group.position.set(x,y,z);group.rotation.y=-o.rotation*Math.PI/180;
+ let mesh;
+ if(o.type==='floor'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0x94a3b8));mesh.position.y=-o.height/2}
+ else if(o.type==='roof'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,30,o.depth),mat(0x475569));mesh.position.y=o.height/2}
+ else if(o.type==='wall'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0x64748b));}
+ else if(o.type==='column'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0x10b981));}
+ else if(o.type==='door'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0xd4a017));}
+ else if(o.type==='window'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),new THREE.MeshStandardMaterial({color:0x38bdf8,transparent:true,opacity:.55,roughness:.2,metalness:.1}));mesh.position.y=(o.installHeight||0)+o.height/2-o.height/2}
+ else if(o.type==='stair'){mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0xa78bfa));}
+ else {mesh=new THREE.Mesh(new THREE.BoxGeometry(o.width,o.height,o.depth),mat(0xb8a58a));}
+ mesh.castShadow=true;mesh.receiveShadow=true;group.add(mesh);
+ if(o.type==='door'){const knob=new THREE.Mesh(new THREE.SphereGeometry(5,12,12),mat(0x333333));knob.position.set(o.width/2-12,0,o.depth/2+6);group.add(knob)}
+ if(o.type==='window'){const frame=mat(0x334155);for(const [px,pz,ww,dd] of [[0,-o.depth/2-3,o.width,4],[0,o.depth/2+3,o.width,4],[-o.width/2-3,0,4,o.depth],[o.width/2+3,0,4,o.depth]]){const f=new THREE.Mesh(new THREE.BoxGeometry(ww, o.height, dd),frame);f.position.set(px,0,pz);f.scale.y=.05;group.add(f)}}
+ return group;
+}
+function update3D(){
+ if(!threeReady)return;
+ for(const [id,g] of threeObjects){scene.remove(g);g.traverse(x=>{if(x.geometry)x.geometry.dispose();if(x.material&&!Array.isArray(x.material))x.material.dispose()})}
+ threeObjects.clear();
+ for(const o of state.objects){const g=build3D(o);scene.add(g);threeObjects.set(o.id,g)}
+ const vals=state.objects.filter(o=>o.type==='floor');if(vals.length){const f=vals[0];controls.target.set(f.x,0,f.y)}
+ resize3D();
+}
+function resize3D(){if(!renderer)return;const root=$('threeRoot');renderer.setSize(root.clientWidth,root.clientHeight,false);camera.aspect=root.clientWidth/root.clientHeight;camera.updateProjectionMatrix()}
+window.addEventListener('resize',()=>{resize();resize3D()});
+resize();renderProps();updateSelectionLabel();
+</script>
+</body>
+</html>
