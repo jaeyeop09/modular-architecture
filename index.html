@@ -52,7 +52,7 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
   </div>
 </aside>
 <section class="workspace">
-  <div id="twoView" class="view"><canvas id="plan2d"></canvas><div class="legend">Grid 20cm · Snap 2cm · 단위 cm</div></div>
+  <div id="twoView" class="view"><canvas id="plan2d"></canvas><div class="legend">Grid 20cm · Snap 20cm · Shift: 2cm 정밀 · 단위 cm</div></div>
   <div id="threeRoot" class="view hidden"></div>
   <div class="bottom"><span>현재 모드:</span><span id="modeLabel" class="mode">2D 평면도</span><span>선택:</span><span id="selectionLabel">없음</span></div>
 </section>
@@ -78,7 +78,7 @@ button,input,select{font:inherit}button{border:1px solid var(--line);background:
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js';
 import {OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/controls/OrbitControls.js';
 
-const SNAP=2, GRID=20, SCALE=0.55;
+const SNAP=20, FINE_SNAP=2, GRID=20, SCALE=0.55;
 const defaults={
  wall:{width:400,depth:20,height:300},
  door:{width:90,depth:10,height:210},
@@ -93,7 +93,7 @@ let state={projectName:'My Building',objects:[],selectedId:null,version:1};
 let history=[],future=[],drag=null,mode='2d',lastSnapshot=clone(state);
 const $=id=>document.getElementById(id), canvas=$('plan2d'),ctx=canvas.getContext('2d');
 function uid(type){return type+'-'+Math.random().toString(36).slice(2,9)}
-function snap(v){return Math.round(v/SNAP)*SNAP}
+function snap(v,step=SNAP){return Math.round(v/step)*step}
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function selected(){return state.objects.find(o=>o.id===state.selectedId)||null}
 function commit(label='변경'){
@@ -111,7 +111,7 @@ function addObject(type,x=500,y=400){
 function removeSelected(){if(!selected())return;const id=state.selectedId;state.objects=state.objects.filter(o=>o.id!==id);state.selectedId=null;commit('객체 삭제')}
 function setProp(key,val){
  const o=selected(); if(!o)return; const n=Number(val); if(!Number.isFinite(n))return;
- if(['x','y','width','depth','height','rotation','installHeight'].includes(key))o[key]=key==='rotation'?n:snap(n);
+ if(['x','y','width','depth','height','rotation','installHeight'].includes(key))o[key]=key==='rotation'?n:snap(n,FINE_SNAP);
  if(o.width<2)o.width=2;if(o.depth<2)o.depth=2;if(o.height<2)o.height=2;
  commit('속성 수정');
 }
@@ -161,12 +161,12 @@ canvas.addEventListener('pointerdown',e=>{
 canvas.addEventListener('pointermove',e=>{
  if(!drag)return;const r=canvas.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,o=state.objects.find(x=>x.id===drag.id);if(!o)return;
  const a=screenToWorld(mx,my),b=screenToWorld(drag.startX,drag.startY),dx=a.x-b.x,dy=a.y-b.y;
- o.x=drag.free?drag.ox+dx:snap(drag.ox+dx);o.y=drag.free?drag.oy+dy:snap(drag.oy+dy);render2D();renderProps();updateSelectionLabel();
+ const step=drag.free?FINE_SNAP:SNAP;o.x=snap(drag.ox+dx,step);o.y=snap(drag.oy+dy,step);render2D();renderProps();updateSelectionLabel();
 });
 canvas.addEventListener('pointerup',()=>{if(drag){drag=null;commit('객체 이동')}})
 window.addEventListener('keydown',e=>{
  if(e.key==='Delete'||e.key==='Backspace'){if(document.activeElement.tagName!=='INPUT')removeSelected()}
- if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&selected()&&document.activeElement.tagName!=='INPUT'){e.preventDefault();const o=selected();if(e.key==='ArrowUp')o.y-=SNAP;if(e.key==='ArrowDown')o.y+=SNAP;if(e.key==='ArrowLeft')o.x-=SNAP;if(e.key==='ArrowRight')o.x+=SNAP;commit('2cm 이동')}
+ if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)&&selected()&&document.activeElement.tagName!=='INPUT'){e.preventDefault();const o=selected();if(e.key==='ArrowUp')o.y-=FINE_SNAP;if(e.key==='ArrowDown')o.y+=FINE_SNAP;if(e.key==='ArrowLeft')o.x-=FINE_SNAP;if(e.key==='ArrowRight')o.x+=FINE_SNAP;commit('2cm 이동')}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo()}
 });
@@ -176,7 +176,7 @@ function renderProps(){
  const fields=[['x','X 좌표'],['y','Y 좌표'],['width','너비'],['depth','깊이/두께'],['height','높이'],['rotation','회전']];
  if(o.type==='window')fields.push(['installHeight','설치 높이']);
  for(const [key,label] of fields){const row=document.createElement('div');row.className='prop-row';const l=document.createElement('label');l.textContent=label;const inp=document.createElement('input');inp.type='number';inp.step=key==='rotation'?'1':'2';inp.value=o[key]??0;inp.addEventListener('change',()=>setProp(key,inp.value));row.append(l,inp);box.append(row)}
- const note=document.createElement('div');note.className='prop-note';note.innerHTML='단위: cm · 일반 이동은 2cm Snap<br>현재 ID: '+o.id;box.append(note);
+ const note=document.createElement('div');note.className='prop-note';note.innerHTML='단위: cm · 마우스 이동: 20cm Snap · Shift 이동: 2cm 정밀 Snap<br>현재 ID: '+o.id;box.append(note);
 }
 function updateSelectionLabel(){$('selectionLabel').textContent=selected()?selected().type+' · '+selected().id:'없음'}
 function setMode(m){mode=m;$('twoView').classList.toggle('hidden',m!=='2d');$('threeRoot').classList.toggle('hidden',m!=='3d');$('mode2d').classList.toggle('primary',m==='2d');$('mode3d').classList.toggle('primary',m==='3d');$('modeLabel').textContent=m==='2d'?'2D 평면도':'3D 공간';if(m==='3d')init3D();update3D()}
